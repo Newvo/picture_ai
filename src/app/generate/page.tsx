@@ -3,14 +3,17 @@
 import { useState } from "react";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { TextToImageForm } from "@/components/forms/TextToImageForm";
+import { ImageToImageForm } from "@/components/forms/ImageToImageForm";
 import { ImagePreview } from "@/components/generate/ImagePreview";
 import { toggleFavorite } from "@/lib/storage";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export default function GeneratePage() {
   const [generatedImageUrl, setGeneratedImageUrl] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [currentImageId, setCurrentImageId] = useState<string | null>(null);
   const [isFavorite, setIsFavorite] = useState(false);
+  const [activeTab, setActiveTab] = useState("text-to-image");
 
   // 处理生成开始
   const handleGenerationStart = () => {
@@ -43,6 +46,11 @@ export default function GeneratePage() {
     }
   };
 
+  // 处理选项卡切换
+  const handleTabChange = (value: string) => {
+    setActiveTab(value);
+  };
+
   return (
     <MainLayout>
       <div className="container max-w-6xl mx-auto py-8 px-4 md:px-6">
@@ -50,11 +58,33 @@ export default function GeneratePage() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2">
             <div className="p-6 border rounded-lg">
-              <TextToImageForm
-                onGenerationStart={handleGenerationStart}
-                onGenerationComplete={handleGenerationComplete}
-                onGenerationError={handleGenerationError}
-              />
+              <Tabs 
+                defaultValue="text-to-image" 
+                value={activeTab}
+                onValueChange={handleTabChange}
+                className="mb-6"
+              >
+                <TabsList className="grid grid-cols-2 mb-4">
+                  <TabsTrigger value="text-to-image">文本生成图片</TabsTrigger>
+                  <TabsTrigger value="image-to-image">图片生成图片</TabsTrigger>
+                </TabsList>
+                
+                <TabsContent value="text-to-image">
+                  <TextToImageForm
+                    onGenerationStart={handleGenerationStart}
+                    onGenerationComplete={handleGenerationComplete}
+                    onGenerationError={handleGenerationError}
+                  />
+                </TabsContent>
+                
+                <TabsContent value="image-to-image">
+                  <ImageToImageForm
+                    onGenerationStart={handleGenerationStart}
+                    onGenerationComplete={handleGenerationComplete}
+                    onGenerationError={handleGenerationError}
+                  />
+                </TabsContent>
+              </Tabs>
             </div>
           </div>
           <div>

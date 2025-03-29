@@ -72,6 +72,9 @@ Required range: 0 <= x <= 9999999999
 image
 stringdefault:data:image/webp;base64, XXX
 The image that needs to be uploaded should be converted into base64 format.
+
+
+
 Response
 200
 

@@ -15,6 +15,8 @@ export interface GenerationOptions {
   image?: string | null; // 用于图生图功能的base64图片
 }
 
+
+
 /**
  * 图片生成响应接口
  */
