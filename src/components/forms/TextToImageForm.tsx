@@ -2,19 +2,21 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { mockGenerateImage } from "@/lib/api";
+import { generateImage, convertResponseToGenerations } from "@/lib/api";
 import { saveGeneration } from "@/lib/storage";
 
 interface TextToImageFormProps {
   onGenerationStart?: () => void;
   onGenerationComplete?: (imageUrl: string, imageId?: string) => void;
   onGenerationError?: (error: Error) => void;
+  onBatchComplete?: (imageIds: string[]) => void;
 }
 
 export function TextToImageForm({
   onGenerationStart,
   onGenerationComplete,
   onGenerationError,
+  onBatchComplete,
 }: TextToImageFormProps) {
   // 表单状态
   const [prompt, setPrompt] = useState("");
@@ -26,6 +28,7 @@ export function TextToImageForm({
   const [seed, setSeed] = useState(Math.floor(Math.random() * 4999999999));
   const [steps, setSteps] = useState(20);
   const [guidance, setGuidance] = useState(7.5);
+  const [batchSize, setBatchSize] = useState(1);
   
   // 处理表单提交
   const handleSubmit = async (e: React.FormEvent) => {
@@ -40,34 +43,37 @@ export function TextToImageForm({
     onGenerationStart?.();
     
     try {
-      // 调用生成API
-      const response = await mockGenerateImage(prompt, {
+      // 准备API参数
+      const options = {
         negative_prompt: negativePrompt,
         image_size: imageSize,
         seed,
         num_inference_steps: steps,
         guidance_scale: guidance,
-      });
+        batch_size: batchSize
+      };
       
-      // 获取生成的图片URL
-      const imageUrl = response.images[0];
+      // 调用生成API
+      const response = await generateImage(prompt, options);
       
-      // 保存到本地存储
-      const generation = saveGeneration({
-        prompt,
-        negativePrompt: negativePrompt || null,
-        imageUrl,
-        imageSize,
-        model: response.model,
-        seed,
-        inferenceSteps: steps,
-        guidanceScale: guidance,
-        batchSize: 1,
-        sourceImageUrl: null,
-      });
+      if (response.images.length === 0) {
+        throw new Error("图片生成失败：API没有返回图片");
+      }
       
-      // 通知父组件生成完成，并传递生成ID
-      onGenerationComplete?.(imageUrl, generation.id);
+      // 转换API响应为存储格式
+      const generationsData = convertResponseToGenerations(response, prompt, options);
+      
+      // 保存所有生成的图片
+      const savedGenerations = generationsData.map(data => saveGeneration(data));
+      
+      // 如果是批量生成，则通知父组件所有生成的ID
+      if (batchSize > 1 && onBatchComplete) {
+        onBatchComplete(savedGenerations.map(gen => gen.id));
+      } 
+      // 否则只通知第一张图片
+      else if (onGenerationComplete) {
+        onGenerationComplete(savedGenerations[0].imageUrl, savedGenerations[0].id);
+      }
       
       // 重置随机种子
       setSeed(Math.floor(Math.random() * 4999999999));
@@ -128,8 +134,10 @@ export function TextToImageForm({
             <option value="512x512">512 x 512</option>
             <option value="768x768">768 x 768</option>
             <option value="1024x1024">1024 x 1024</option>
-            <option value="1024x1536">1024 x 1536 (竖版)</option>
-            <option value="1536x1024">1536 x 1024 (横版)</option>
+            <option value="960x1280">960 x 1280 (竖版)</option>
+            <option value="768x1024">768 x 1024 (竖版)</option>
+            <option value="720x1440">720 x 1440 (竖版)</option>
+            <option value="720x1280">720 x 1280 (竖版)</option>
           </select>
         </div>
         
@@ -145,7 +153,7 @@ export function TextToImageForm({
             onChange={(e) => setSeed(Number(e.target.value))}
             className="w-full p-2 border rounded-md"
             min={0}
-            max={4999999999}
+            max={9999999999}
             disabled={isGenerating}
           />
         </div>
@@ -161,8 +169,8 @@ export function TextToImageForm({
             value={steps}
             onChange={(e) => setSteps(Number(e.target.value))}
             className="w-full"
-            min={10}
-            max={50}
+            min={1}
+            max={100}
             step={1}
             disabled={isGenerating}
           />
@@ -179,9 +187,27 @@ export function TextToImageForm({
             value={guidance}
             onChange={(e) => setGuidance(Number(e.target.value))}
             className="w-full"
-            min={1}
+            min={0}
             max={20}
             step={0.1}
+            disabled={isGenerating}
+          />
+        </div>
+        
+        {/* 批量生成数量 */}
+        <div className="space-y-2">
+          <label htmlFor="batchSize" className="block text-sm font-medium">
+            批量生成数量 ({batchSize})
+          </label>
+          <input
+            type="range"
+            id="batchSize"
+            value={batchSize}
+            onChange={(e) => setBatchSize(Number(e.target.value))}
+            className="w-full"
+            min={1}
+            max={4}
+            step={1}
             disabled={isGenerating}
           />
         </div>
@@ -193,7 +219,7 @@ export function TextToImageForm({
         className="w-full"
         disabled={isGenerating || !prompt.trim()}
       >
-        {isGenerating ? "生成中..." : "生成图片"}
+        {isGenerating ? "生成中..." : `生成${batchSize > 1 ? batchSize + '张' : ''}图片`}
       </Button>
     </form>
   );

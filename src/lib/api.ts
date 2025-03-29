@@ -1,6 +1,10 @@
 import axios from 'axios';
+import { Generation } from './storage';
+import { v4 as uuidv4 } from 'uuid';
 
-// 定义图片生成选项接口
+/**
+ * 图片生成选项接口
+ */
 export interface GenerationOptions {
   model?: string;
   negative_prompt?: string;
@@ -12,23 +16,33 @@ export interface GenerationOptions {
   image?: string | null; // 用于图生图功能的base64图片
 }
 
-// 定义API响应接口
+/**
+ * 图片生成响应接口
+ */
 export interface GenerationResponse {
-  id: string;
-  images: string[]; // base64编码的图片
-  model: string;
-  parameters: {
-    prompt: string;
-    negative_prompt: string;
-    image_size: string;
-    batch_size: number;
-    seed: number;
-    num_inference_steps: number;
-    guidance_scale: number;
+  images: Array<{
+    url: string; // 生成的图片URL，有效期为1小时
+  }>;
+  timings: {
+    inference: number;
   };
+  seed: number;
 }
 
-// 生成图片API调用
+/**
+ * 获取API基础URL
+ */
+const getApiUrl = () => {
+  const baseUrl = process.env.NEXT_PUBLIC_SILICONFLOW_API_URL || 'https://api.siliconflow.cn/v1';
+  return baseUrl;
+};
+
+/**
+ * 生成图片API调用
+ * @param prompt 提示词
+ * @param options 生成选项
+ * @returns 生成结果
+ */
 export async function generateImage(prompt: string, options?: GenerationOptions): Promise<GenerationResponse> {
   // 默认选项
   const defaultOptions: GenerationOptions = {
@@ -60,7 +74,7 @@ export async function generateImage(prompt: string, options?: GenerationOptions)
 
     // 发送请求
     const response = await axios.post<GenerationResponse>(
-      'https://api.siliconflow.cn/v1/images/generations',
+      `${getApiUrl()}/images/generations`,
       requestData,
       { headers }
     );
@@ -72,7 +86,9 @@ export async function generateImage(prompt: string, options?: GenerationOptions)
   }
 }
 
-// 模拟API调用（开发阶段使用）
+/**
+ * 模拟API调用（开发阶段使用）
+ */
 export async function mockGenerateImage(prompt: string, options?: GenerationOptions): Promise<GenerationResponse> {
   // 默认选项
   const defaultOptions: GenerationOptions = {
@@ -92,25 +108,55 @@ export async function mockGenerateImage(prompt: string, options?: GenerationOpti
   // 模拟延迟
   await new Promise(resolve => setTimeout(resolve, 2000));
   
-  // 生成随机ID
-  const id = Math.random().toString(36).substring(2, 15);
-  
   // 返回模拟响应
   return {
-    id,
-    images: [
-      // 占位图片URL，实际项目中会返回base64编码的图片
-      "https://via.placeholder.com/1024x1024?text=Generated+Image"
-    ],
-    model: mergedOptions.model || defaultOptions.model,
-    parameters: {
-      prompt,
-      negative_prompt: mergedOptions.negative_prompt || "",
-      image_size: mergedOptions.image_size || "1024x1024",
-      batch_size: mergedOptions.batch_size || 1,
-      seed: mergedOptions.seed || Math.floor(Math.random() * 4999999999),
-      num_inference_steps: mergedOptions.num_inference_steps || 20,
-      guidance_scale: mergedOptions.guidance_scale || 7.5,
-    }
+    images: Array(mergedOptions.batch_size || 1).fill(0).map(() => ({
+      url: "https://via.placeholder.com/1024x1024?text=Generated+Image"
+    })),
+    timings: {
+      inference: 3.5
+    },
+    seed: mergedOptions.seed || Math.floor(Math.random() * 4999999999)
+  };
+}
+
+/**
+ * 将API响应转换为存储格式
+ * @param response API响应
+ * @param prompt 提示词
+ * @param options 生成选项
+ * @returns 转换后的生成记录数组
+ */
+export function convertResponseToGenerations(
+  response: GenerationResponse, 
+  prompt: string, 
+  options: GenerationOptions
+): Omit<Generation, 'id' | 'createdAt' | 'isFavorite'>[] {
+  return response.images.map(image => ({
+    prompt,
+    negativePrompt: options.negative_prompt || null,
+    imageUrl: image.url,
+    imageSize: options.image_size || '1024x1024',
+    model: options.model || 'Kwai-Kolors/Kolors',
+    seed: response.seed,
+    inferenceSteps: options.num_inference_steps || 20,
+    guidanceScale: options.guidance_scale || 7.5,
+    batchSize: options.batch_size || 1,
+    sourceImageUrl: options.image || null,
+  }));
+}
+
+/**
+ * 验证API配置是否正确
+ * @returns 配置状态对象
+ */
+export function validateApiConfig() {
+  const apiKey = process.env.NEXT_PUBLIC_SILICONFLOW_API_KEY;
+  const apiUrl = getApiUrl();
+  
+  return {
+    hasApiKey: !!apiKey && apiKey !== 'your_api_key_here',
+    apiUrl,
+    isConfigured: !!apiKey && apiKey !== 'your_api_key_here'
   };
 } 
