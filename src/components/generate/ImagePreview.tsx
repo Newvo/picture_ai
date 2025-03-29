@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
+import Image from "next/image";
 
 interface ImagePreviewProps {
   imageUrl: string | null;
@@ -45,10 +46,13 @@ export function ImagePreview({
           </div>
         ) : imageUrl ? (
           <div className="relative h-full">
-            <img
+            <Image
               src={imageUrl}
               alt="生成的图片"
-              className="w-full h-full object-contain"
+              className="object-contain"
+              fill
+              sizes="(max-width: 768px) 100vw, 50vw"
+              priority
             />
           </div>
         ) : (
